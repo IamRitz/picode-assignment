@@ -32,3 +32,8 @@ const app = new App({
 
     console.log('⚡️ Bolt app is running on port 5000!');
 })();
+
+
+app.receiver.app.get('/', (req, res) => {
+  res.send('Slack bot is alive 🚀');
+});
