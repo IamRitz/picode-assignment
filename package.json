@@ -1,0 +1,18 @@
+{
+  "name": "picode-assignment",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/IamRitz/picode-assignment.git",
+  "author": "Ritesh Srivastava <26003726+IamRitz@users.noreply.github.com>",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@slack/bolt": "^4.3.0",
+    "axios": "^1.9.0",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0"
+  },
+  "scripts" : {
+      "start": "node server.js"
+  }
+}
