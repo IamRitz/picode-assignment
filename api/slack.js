@@ -1,4 +1,7 @@
-import { App, ExpressReceiver } from '@slack/bolt';
+
+import pkg from '@slack/bolt';
+const { App, ExpressReceiver } = pkg;
+
 import serverless from 'serverless-http';
 import axios from 'axios';
 import dotenv from 'dotenv';
