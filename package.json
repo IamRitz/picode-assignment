@@ -5,7 +5,7 @@
   "repository": "https://github.com/IamRitz/picode-assignment.git",
   "author": "Ritesh Srivastava <26003726+IamRitz@users.noreply.github.com>",
   "license": "MIT",
-  "type": "module",
+  "type": "commonjs",
   "dependencies": {
     "@slack/bolt": "^4.3.0",
     "axios": "^1.9.0",

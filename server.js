@@ -1,36 +1,61 @@
-import dotenv from 'dotenv';
-dotenv.config();
-// Import the required modules
+require("dotenv").config();
+const axios = require("axios");
+const { App } = require("@slack/bolt");
 
-import axios from 'axios';
-import pkg from '@slack/bolt';
-const { App } = pkg;
-const signingSecret = process.env['SLACK_SIGNING_SECRET'];
-const botToken = process.env['SLACK_BOT_TOKEN'];
+// Load environment variables
+const signingSecret = process.env["SLACK_SIGNING_SECRET"];
+const botToken = process.env["SLACK_BOT_TOKEN"];
 
+// Initialize Bolt App
 const app = new App({
-    signingSecret,
+    signingSecret: signingSecret,
     token: botToken,
+});
+
+const timers = new Map();
+
+app.event('message', async ({ event, client }) => {
+  const channelId = event.channel;
+
+  // Clear previous timer if it exists
+  if (timers.has(channelId)) {
+    clearTimeout(timers.get(channelId));
+  }
+
+  // Start a new 5-second timer
+  const timer = setTimeout(async () => {
+    try {
+      await client.chat.postMessage({
+        channel: channelId,
+        text: 'Acknowledged ✅',
+      });
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    }
+  }, 5000);
+
+  // Save timer for this channel
+  timers.set(channelId, timer);
+});
+
+// Start the app
+(async () => {
+    await app.start(process.env.PORT || 3000);
+
+    console.log("⚡️ Bolt app is running on port 3000!");
+
+    app.message("quote", async ({ message, say }) => {
+        try {
+            const resp = await axios.get("https://zenquotes.io/api/random");
+            const quote = resp.data[0].q + " — " + resp.data[0].a;
+
+            console.log(message); // Log the message
+
+            await say(`Hello, <@${message.user}>, ${quote}`);
+        } catch (error) {
+            console.error("Error fetching quote:", error);
+        }
     });
 
-// Listen for messages in channels
-// This will listen to all messages in channels the bot is a member of
-// You can also listen to specific channels by using the channel ID
-// For example, to listen to a channel with ID C1234567890, use the following code
-
-(async () => { 
-    // start the app
-    await app.start(process.env.PORT || 5000);
-
-
-    app.message('quote', async ({ message, say }) => {
-        let response = await axios.get('https://api.quotable.io/random');
-        console.log(message); // Log the message object
-        let quote = response.data.content;
-        await say(`Here's a random quote: "${quote}"`);
-    });
-
-    console.log('⚡️ Bolt app is running on port 5000!');
 })();
 
-export default app;
