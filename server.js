@@ -1,10 +1,17 @@
 require('dotenv').config();
 const express = require('express');
+const { z } = require('zod');
 
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 
 const { WebClient } = require('@slack/web-api');
+
+
+// Zod schema for validating /send-message
+const sendMessageSchema = z.object({
+  text: z.string().min(1, "Message text is required")
+});
 
 const app = express();
 app.use(express.json());
@@ -48,6 +55,8 @@ app.post('/slack/events', verifySlackRequest, async (req, res) => {
         if (type === 'url_verification') {
             return res.status(200).send({ challenge });
         }
+
+        res.sendStatus(200);
 
         if (type === 'event_callback' && event.type === 'message' && !event.bot_id) {
             console.log(`[Slack] Message received: ${event.text} from user ${event.user}`);
