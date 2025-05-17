@@ -101,7 +101,7 @@ app.post('/slack/events', verifySlackRequest, async (req, res) => {
             }, 5000);
         }
 
-        res.sendStatus(200);
+        // res.sendStatus(200);
     }
     catch (error) {
         console.error('Error in /slack/events:', error);
