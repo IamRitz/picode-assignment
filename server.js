@@ -44,8 +44,24 @@ function verifySlackRequest(req, res, next) {
 	return res.status(400).send('Slack verification failed');
 }
 
-// channel message timer
-const ackTimers = {}; 
+
+// Function to send a message to Slack with retries in case of failure
+async function safeSlackPostMessage(client, params, retries = 2) {
+	try {
+		return await client.chat.postMessage(params);
+	} catch (err) {
+		if (retries > 0) {
+			console.warn('Slack API failed, retrying...', err.message);
+			await new Promise(res => setTimeout(res, 1000)); // wait 1s
+			return safeSlackPostMessage(client, params, retries - 1);
+		} else {
+			throw err;
+		}
+	}
+}
+
+
+const ackTimers = {};  // channel message timer
 
 // /slack/events - endpoint to handle Slack events and messages
 app.post('/slack/events', verifySlackRequest, async (req, res) => {
@@ -67,13 +83,13 @@ app.post('/slack/events', verifySlackRequest, async (req, res) => {
             // Store the acknowledgment timer for the channel
             ackTimers[event.channel] = setTimeout(async () => {
                 try {
-                    await slackClient.chat.postMessage({
+                    await safeSlackPostMessage(slackClient, {
                         channel: event.channel,
                         text: 'acknowledged'
                     });
                     console.log(`[Slack] Sent "acknowledged" to ${event.channel}`);
                 } catch (err) {
-                    console.error('Error sending acknowledgment:', err);
+                    console.error('Slack message failed after retries:', err);
                 }
             }, 5000);
         }
@@ -118,7 +134,6 @@ app.post('/send-message', jwtAuthMiddleware, async (req, res) => {
 	const { text } = validation.data;
 
 	try {
-
 		const result = await slackClient.chat.postMessage({
 			channel: SLACK_CHANNEL_ID,
 			text
