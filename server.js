@@ -1,17 +1,11 @@
 require('dotenv').config();
 const express = require('express');
-const { z } = require('zod');
+const { SlackEventSchema, sendMessageSchema } = require('./validation');
 
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 
 const { WebClient } = require('@slack/web-api');
-
-
-// Zod schema for validating /send-message
-const sendMessageSchema = z.object({
-  text: z.string().min(1, "Message text is required")
-});
 
 const app = express();
 app.use(express.json());
@@ -27,23 +21,33 @@ function verifySlackRequest(req, res, next) {
     const slackSignature = req.headers['x-slack-signature'];
 	const requestTimestamp = req.headers['x-slack-request-timestamp'];
 
+    if (!slackSignature || !requestTimestamp) {
+        console.warn('[Slack Verification] Missing Slack headers');
+        return res.status(400).send('Missing Slack headers');
+    }
 
+    // Check if the request is a retry and ignore it
     if (req.headers['x-slack-retry-num']) {
         console.log('Slack retry detected');
         return res.sendStatus(200);
     }
-
-    console.log('🔔 /slack/events hit');
-    console.log('→ x-slack-signature:', req.headers['x-slack-signature']);
-    console.log('→ x-slack-request-timestamp:', req.headers['x-slack-request-timestamp']);
-    console.log('→ x-slack-retry-num:', req.headers['x-slack-retry-num']);
-    console.log('→ x-slack-retry-reason:', req.headers['x-slack-retry-reason']);
 
 	// Avoid replay attacks
 	const fiveMinutesAgo = Math.floor(Date.now() / 1000) - (60 * 5);
 	if (requestTimestamp < fiveMinutesAgo) {
 		return res.status(400).send('Ignored (too old)');
 	}
+
+    const parsed = SlackEventSchema.safeParse(req.body);
+
+    // Check if the request body is valid
+    if (!parsed.success) {
+        console.warn('[Slack Verificatioion] Invalid Slack body:', parsed.error.flatten());
+        return res.status(400).json({
+          error: 'Invalid Slack request body',
+          issues: parsed.error.issues,
+        });
+    }
 
 	const sigBaseString = `v0:${requestTimestamp}:${JSON.stringify(req.body)}`;
 	const hmac = crypto.createHmac('sha256', SLACK_SIGNING_SECRET);
@@ -52,11 +56,11 @@ function verifySlackRequest(req, res, next) {
 	if (crypto.timingSafeEqual(Buffer.from(mySignature), Buffer.from(slackSignature))) {
 		return next();
 	}
-
-    console.log("[Slack] Signature verification failed");
-	return res.status(400).send('Slack verification failed');
+    else{
+        console.log("[Slack Verification] Signature verification failed");
+        return res.status(400).send('Slack verification failed');
+    }
 }
-
 
 // Function to send a message to Slack with retries in case of failure
 async function safeSlackPostMessage(client, params, retries = 2) {
