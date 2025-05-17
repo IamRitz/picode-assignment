@@ -65,6 +65,13 @@ const ackTimers = {};  // channel message timer
 
 // /slack/events - endpoint to handle Slack events and messages
 app.post('/slack/events', verifySlackRequest, async (req, res) => {
+
+    console.log('🔔 /slack/events hit');
+    console.log('→ x-slack-signature:', req.headers['x-slack-signature']);
+    console.log('→ x-slack-request-timestamp:', req.headers['x-slack-request-timestamp']);
+    console.log('→ x-slack-retry-num:', req.headers['x-slack-retry-num']);
+    console.log('→ x-slack-retry-reason:', req.headers['x-slack-retry-reason']);
+
     try {
         const { type, challenge, event } = req.body;
 
