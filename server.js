@@ -1,6 +1,9 @@
 require('dotenv').config();
 const express = require('express');
+
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
+
 const { WebClient } = require('@slack/web-api');
 
 const app = express();
@@ -75,6 +78,50 @@ app.post('/slack/events', verifySlackRequest, async (req, res) => {
 });
 
 
+function jwtAuthMiddleware(req, res, next) {
+  const authHeader = req.headers['authorization'] || '';
+  const token = authHeader.split(' ')[1]; // Bearer <token>
+
+  if (!token) {
+    return res.status(401).json({ error: 'Token missing' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded; // optional: attach user data
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+// /send-message - endpoint to send a message to the given channel
+app.post('/send-message', jwtAuthMiddleware, async (req, res) => {
+	const validation = sendMessageSchema.safeParse(req.body);
+
+	if (!validation.success) {
+		return res.status(400).json({
+			error: 'Validation failed',
+			details: validation.error.format()
+		});
+	}
+
+	const { text } = validation.data;
+
+	try {
+
+		const result = await slackClient.chat.postMessage({
+			channel: SLACK_CHANNEL_ID,
+			text
+		});
+		res.status(200).json({ success: true, slackResponse: result });
+	} catch (err) {
+		console.error('Slack send error:', err);
+		res.status(500).json({ error: 'Failed to send message' });
+	}
+});
+
+
 // root health check
 app.get('/', (req, res) => {
 	res.send('Slack bot backend is running');
@@ -84,4 +131,3 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
 	console.log(`Server running at http://localhost:${PORT}`);
 });
-
