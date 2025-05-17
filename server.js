@@ -65,21 +65,21 @@ const ackTimers = {};  // channel message timer
 
 // /slack/events - endpoint to handle Slack events and messages
 app.post('/slack/events', verifySlackRequest, async (req, res) => {
-
-    console.log('🔔 /slack/events hit');
-    console.log('→ x-slack-signature:', req.headers['x-slack-signature']);
-    console.log('→ x-slack-request-timestamp:', req.headers['x-slack-request-timestamp']);
-    console.log('→ x-slack-retry-num:', req.headers['x-slack-retry-num']);
-    console.log('→ x-slack-retry-reason:', req.headers['x-slack-retry-reason']);
-
     try {
+        console.log('🔔 /slack/events hit');
+        console.log('→ x-slack-signature:', req.headers['x-slack-signature']);
+        console.log('→ x-slack-request-timestamp:', req.headers['x-slack-request-timestamp']);
+        console.log('→ x-slack-retry-num:', req.headers['x-slack-retry-num']);
+        console.log('→ x-slack-retry-reason:', req.headers['x-slack-retry-reason']);
         const { type, challenge, event } = req.body;
 
         if (type === 'url_verification') {
             return res.status(200).send({ challenge });
         }
 
-        res.sendStatus(200);
+        if (event.subtype === 'bot_message' || event.bot_id) {
+          return res.sendStatus(200); // Ignore messages from any bot
+        }
 
         if (type === 'event_callback' && event.type === 'message' && !event.bot_id) {
             console.log(`[Slack] Message received: ${event.text} from user ${event.user}`);
@@ -101,7 +101,7 @@ app.post('/slack/events', verifySlackRequest, async (req, res) => {
             }, 5000);
         }
 
-        // res.sendStatus(200);
+        res.sendStatus(200);
     }
     catch (error) {
         console.error('Error in /slack/events:', error);
