@@ -28,6 +28,11 @@ function verifySlackRequest(req, res, next) {
 	const requestTimestamp = req.headers['x-slack-request-timestamp'];
 
 
+    if (req.headers['x-slack-retry-num']) {
+        console.log('Slack retry detected');
+        return res.sendStatus(200);
+    }
+
     console.log('🔔 /slack/events hit');
     console.log('→ x-slack-signature:', req.headers['x-slack-signature']);
     console.log('→ x-slack-request-timestamp:', req.headers['x-slack-request-timestamp']);
@@ -80,7 +85,8 @@ app.post('/slack/events', verifySlackRequest, async (req, res) => {
         }
 
         if (event.subtype === 'bot_message' || event.bot_id) {
-          return res.sendStatus(200); // Ignore messages from any bot
+            console.log('[Slack] Ignoring bot message from bot');
+            return res.sendStatus(200); // Ignore messages from any bot
         }
 
         if (type === 'event_callback' && event.type === 'message' && !event.bot_id) {
