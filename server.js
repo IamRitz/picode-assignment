@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const crypto = require('crypto');
 const { WebClient } = require('@slack/web-api');
 
 const app = express();
