@@ -37,33 +37,40 @@ function verifySlackRequest(req, res, next) {
 const ackTimers = {}; 
 
 app.post('/slack/events', verifySlackRequest, async (req, res) => {
-	const { type, challenge, event } = req.body;
 
-	if (type === 'url_verification') {
-		return res.status(200).send({ challenge });
-	}
+    try {
+        const { type, challenge, event } = req.body;
 
-	if (type === 'event_callback' && event.type === 'message' && !event.bot_id) {
-		console.log(`[Slack] Message received: ${event.text} from user ${event.user}`);
+        if (type === 'url_verification') {
+            return res.status(200).send({ challenge });
+        }
 
-		// Reset acknowledgment timer for the channel to avoid duplicate acknowledgments
-		if (ackTimers[event.channel]) clearTimeout(ackTimers[event.channel]);
+        if (type === 'event_callback' && event.type === 'message' && !event.bot_id) {
+            console.log(`[Slack] Message received: ${event.text} from user ${event.user}`);
 
-        // Store the acknowledgment timer for the channel
-		ackTimers[event.channel] = setTimeout(async () => {
-			try {
-				await slackClient.chat.postMessage({
-					channel: event.channel,
-					text: 'acknowledged'
-				});
-				console.log(`[Slack] Sent "acknowledged" to ${event.channel}`);
-			} catch (err) {
-				console.error('Error sending acknowledgment:', err);
-			}
-		}, 5000);
-	}
+            // Reset acknowledgment timer for the channel to avoid duplicate acknowledgments
+            if (ackTimers[event.channel]) clearTimeout(ackTimers[event.channel]);
 
-	res.sendStatus(200);
+            // Store the acknowledgment timer for the channel
+            ackTimers[event.channel] = setTimeout(async () => {
+                try {
+                    await slackClient.chat.postMessage({
+                        channel: event.channel,
+                        text: 'acknowledged'
+                    });
+                    console.log(`[Slack] Sent "acknowledged" to ${event.channel}`);
+                } catch (err) {
+                    console.error('Error sending acknowledgment:', err);
+                }
+            }, 5000);
+        }
+
+        res.sendStatus(200);
+    }
+    catch (error) {
+        console.error('Error in /slack/events:', err);
+        return res.status(500).send('Server Error');
+    }
 });
 
 
