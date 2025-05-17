@@ -53,6 +53,7 @@ function verifySlackRequest(req, res, next) {
 		return next();
 	}
 
+    console.log("[Slack] Signature verification failed");
 	return res.status(400).send('Slack verification failed');
 }
 
