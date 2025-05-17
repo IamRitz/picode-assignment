@@ -8,10 +8,12 @@
   "type": "commonjs",
   "dependencies": {
     "@slack/bolt": "^4.3.0",
+    "@slack/web-api": "^7.9.1",
     "axios": "^1.9.0",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
-    "serverless-http": "^3.2.0"
+    "serverless-http": "^3.2.0",
+    "zod": "^3.24.4"
   },
   "scripts": {
     "start": "node server.js"

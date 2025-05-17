@@ -1,61 +1,79 @@
-require("dotenv").config();
-const axios = require("axios");
-const { App } = require("@slack/bolt");
+require('dotenv').config();
+const express = require('express');
+const { WebClient } = require('@slack/web-api');
 
-// Load environment variables
-const signingSecret = process.env["SLACK_SIGNING_SECRET"];
-const botToken = process.env["SLACK_BOT_TOKEN"];
+const app = express();
+app.use(express.json());
 
-// Initialize Bolt App
-const app = new App({
-    signingSecret: signingSecret,
-    token: botToken,
+const slackClient = new WebClient(process.env.SLACK_BOT_TOKEN);
+const PORT = process.env.PORT || 3000;
+const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID;
+const SLACK_SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET;
+const AUTH_TOKEN = process.env.API_AUTH_TOKEN;
+
+// Verify Slack Signature
+function verifySlackRequest(req, res, next) {
+    const slackSignature = req.headers['x-slack-signature'];
+	const requestTimestamp = req.headers['x-slack-request-timestamp'];
+
+	// Avoid replay attacks
+	const fiveMinutesAgo = Math.floor(Date.now() / 1000) - (60 * 5);
+	if (requestTimestamp < fiveMinutesAgo) {
+		return res.status(400).send('Ignored (too old)');
+	}
+
+	const sigBaseString = `v0:${requestTimestamp}:${JSON.stringify(req.body)}`;
+	const hmac = crypto.createHmac('sha256', SLACK_SIGNING_SECRET);
+	const mySignature = `v0=${hmac.update(sigBaseString).digest('hex')}`;
+
+	if (crypto.timingSafeEqual(Buffer.from(mySignature), Buffer.from(slackSignature))) {
+		return next();
+	}
+
+	return res.status(400).send('Slack verification failed');
+}
+
+// channel message timer
+const ackTimers = {}; 
+
+app.post('/slack/events', verifySlackRequest, async (req, res) => {
+	const { type, challenge, event } = req.body;
+
+	if (type === 'url_verification') {
+		return res.status(200).send({ challenge });
+	}
+
+	if (type === 'event_callback' && event.type === 'message' && !event.bot_id) {
+		console.log(`[Slack] Message received: ${event.text} from user ${event.user}`);
+
+		// Reset acknowledgment timer for the channel to avoid duplicate acknowledgments
+		if (ackTimers[event.channel]) clearTimeout(ackTimers[event.channel]);
+
+        // Store the acknowledgment timer for the channel
+		ackTimers[event.channel] = setTimeout(async () => {
+			try {
+				await slackClient.chat.postMessage({
+					channel: event.channel,
+					text: 'acknowledged'
+				});
+				console.log(`[Slack] Sent "acknowledged" to ${event.channel}`);
+			} catch (err) {
+				console.error('Error sending acknowledgment:', err);
+			}
+		}, 5000);
+	}
+
+	res.sendStatus(200);
 });
 
-const timers = new Map();
 
-app.event('message', async ({ event, client }) => {
-  const channelId = event.channel;
-
-  // Clear previous timer if it exists
-  if (timers.has(channelId)) {
-    clearTimeout(timers.get(channelId));
-  }
-
-  // Start a new 5-second timer
-  const timer = setTimeout(async () => {
-    try {
-      await client.chat.postMessage({
-        channel: channelId,
-        text: 'Acknowledged ✅',
-      });
-    } catch (error) {
-      console.error('Failed to send message:', error);
-    }
-  }, 5000);
-
-  // Save timer for this channel
-  timers.set(channelId, timer);
+// root health check
+app.get('/', (req, res) => {
+	res.send('Slack bot backend is running');
 });
 
-// Start the app
-(async () => {
-    await app.start(process.env.PORT || 3000);
-
-    console.log("⚡️ Bolt app is running on port 3000!");
-
-    app.message("quote", async ({ message, say }) => {
-        try {
-            const resp = await axios.get("https://zenquotes.io/api/random");
-            const quote = resp.data[0].q + " — " + resp.data[0].a;
-
-            console.log(message); // Log the message
-
-            await say(`Hello, <@${message.user}>, ${quote}`);
-        } catch (error) {
-            console.error("Error fetching quote:", error);
-        }
-    });
-
-})();
+// Start server
+app.listen(PORT, () => {
+	console.log(`Server running at http://localhost:${PORT}`);
+});
 
