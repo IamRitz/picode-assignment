@@ -47,8 +47,8 @@ function verifySlackRequest(req, res, next) {
 // channel message timer
 const ackTimers = {}; 
 
+// /slack/events - endpoint to handle Slack events and messages
 app.post('/slack/events', verifySlackRequest, async (req, res) => {
-
     try {
         const { type, challenge, event } = req.body;
 
@@ -81,27 +81,27 @@ app.post('/slack/events', verifySlackRequest, async (req, res) => {
         res.sendStatus(200);
     }
     catch (error) {
-        console.error('Error in /slack/events:', err);
+        console.error('Error in /slack/events:', error);
         return res.status(500).send('Server Error');
     }
 });
 
 
 function jwtAuthMiddleware(req, res, next) {
-  const authHeader = req.headers['authorization'] || '';
-  const token = authHeader.split(' ')[1]; // Bearer <token>
+	const authHeader = req.headers['authorization'] || '';
+	const token = authHeader.split(' ')[1]; // Bearer <token>
 
-  if (!token) {
-    return res.status(401).json({ error: 'Token missing' });
-  }
+	if (!token) {
+		return res.status(401).json({ error: 'Token missing' });
+	}
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // optional: attach user data
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
+	try {
+		const decoded = jwt.verify(token, process.env.JWT_SECRET);
+		req.user = decoded;  // Store user info in request object, can be used later
+		next();
+	} catch (err) {
+		return res.status(401).json({ error: 'Invalid or expired token' });
+	}
 }
 
 // /send-message - endpoint to send a message to the given channel
