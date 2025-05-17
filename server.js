@@ -115,6 +115,8 @@ app.post('/slack/events', verifySlackRequest, async (req, res) => {
             return res.sendStatus(200); // Ignore messages from any bot
         }
 
+        res.sendStatus(200); // Early response to Slack, to aviod failure as it wait no longer than 3s
+
         if (type === 'event_callback' && event.type === 'message' && !event.bot_id) {
             console.log(`[Slack] Message received: ${event.text} from user ${event.user}`);
 
@@ -134,8 +136,6 @@ app.post('/slack/events', verifySlackRequest, async (req, res) => {
                 }
             }, 5000);
         }
-
-        res.sendStatus(200);
     }
     catch (error) {
         console.error('Error in /slack/events:', error);
