@@ -27,6 +27,13 @@ function verifySlackRequest(req, res, next) {
     const slackSignature = req.headers['x-slack-signature'];
 	const requestTimestamp = req.headers['x-slack-request-timestamp'];
 
+
+    console.log('🔔 /slack/events hit');
+    console.log('→ x-slack-signature:', req.headers['x-slack-signature']);
+    console.log('→ x-slack-request-timestamp:', req.headers['x-slack-request-timestamp']);
+    console.log('→ x-slack-retry-num:', req.headers['x-slack-retry-num']);
+    console.log('→ x-slack-retry-reason:', req.headers['x-slack-retry-reason']);
+
 	// Avoid replay attacks
 	const fiveMinutesAgo = Math.floor(Date.now() / 1000) - (60 * 5);
 	if (requestTimestamp < fiveMinutesAgo) {
@@ -66,11 +73,6 @@ const ackTimers = {};  // channel message timer
 // /slack/events - endpoint to handle Slack events and messages
 app.post('/slack/events', verifySlackRequest, async (req, res) => {
     try {
-        console.log('🔔 /slack/events hit');
-        console.log('→ x-slack-signature:', req.headers['x-slack-signature']);
-        console.log('→ x-slack-request-timestamp:', req.headers['x-slack-request-timestamp']);
-        console.log('→ x-slack-retry-num:', req.headers['x-slack-retry-num']);
-        console.log('→ x-slack-retry-reason:', req.headers['x-slack-retry-reason']);
         const { type, challenge, event } = req.body;
 
         if (type === 'url_verification') {
