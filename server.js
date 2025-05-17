@@ -16,15 +16,30 @@ const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID;
 const SLACK_SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET;
 const AUTH_TOKEN = process.env.API_AUTH_TOKEN;
 
+
+const { z } = require('zod');
+
 // Verify Slack Signature
 function verifySlackRequest(req, res, next) {
-    const slackSignature = req.headers['x-slack-signature'];
-	const requestTimestamp = req.headers['x-slack-request-timestamp'];
+    const headerSchema = z.object({
+        signature: z.string().min(1, 'Missing x-slack-signature'),
+        timestamp: z.string().min(1, 'Missing x-slack-request-timestamp'),
+    });
 
-    if (!slackSignature || !requestTimestamp) {
+    const headerCheck = headerSchema.safeParse({
+        signature: req.headers['x-slack-signature'],
+        timestamp: req.headers['x-slack-request-timestamp'],
+    });
+
+    if (!headerCheck.success) {
         console.warn('[Slack Verification] Missing Slack headers');
-        return res.status(400).send('Missing Slack headers');
+        return res.status(400).json({
+            error: 'Invalid Slack headers',
+            issues: headerCheck.error.issues,
+        });
     }
+
+    const { signature: slackSignature, timestamp: requestTimestamp } = headerCheck.data;
 
     // Check if the request is a retry and ignore it
     if (req.headers['x-slack-retry-num']) {
@@ -49,11 +64,15 @@ function verifySlackRequest(req, res, next) {
         });
     }
 
+    const expectedSecret = z.literal(process.env.SLACK_SIGNING_SECRET || '').parse(process.env.SLACK_SIGNING_SECRET);
+
 	const sigBaseString = `v0:${requestTimestamp}:${JSON.stringify(req.body)}`;
-	const hmac = crypto.createHmac('sha256', SLACK_SIGNING_SECRET);
+	const hmac = crypto.createHmac('sha256', expectedSecret);
 	const mySignature = `v0=${hmac.update(sigBaseString).digest('hex')}`;
 
 	if (crypto.timingSafeEqual(Buffer.from(mySignature), Buffer.from(slackSignature))) {
+        console.log('[Slack Verification] Signature verified');
+        req.validatedBody = parsed.data;  // Store validated body for later use
 		return next();
 	}
     else{
@@ -83,7 +102,7 @@ const ackTimers = {};  // channel message timer
 // /slack/events - endpoint to handle Slack events and messages
 app.post('/slack/events', verifySlackRequest, async (req, res) => {
     try {
-        const { type, challenge, event } = req.body;
+        const { type, challenge, event } = req.validatedBody;
 
         if (type === 'url_verification') {
             return res.status(200).send({ challenge });
