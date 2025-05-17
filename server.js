@@ -8,7 +8,11 @@ const jwt = require('jsonwebtoken');
 const { WebClient } = require('@slack/web-api');
 
 const app = express();
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString(); // Save original body as string
+  }
+}));
 
 const slackClient = new WebClient(process.env.SLACK_BOT_TOKEN);
 const PORT = process.env.PORT || 3000;
@@ -64,10 +68,8 @@ function verifySlackRequest(req, res, next) {
         });
     }
 
-    const expectedSecret = z.literal(process.env.SLACK_SIGNING_SECRET || '').parse(process.env.SLACK_SIGNING_SECRET);
-
-	const sigBaseString = `v0:${requestTimestamp}:${JSON.stringify(req.body)}`;
-	const hmac = crypto.createHmac('sha256', expectedSecret);
+	const sigBaseString = `v0:${requestTimestamp}:${req.rawBody}`;
+	const hmac = crypto.createHmac('sha256', SLACK_SIGNING_SECRET);
 	const mySignature = `v0=${hmac.update(sigBaseString).digest('hex')}`;
 
 	if (crypto.timingSafeEqual(Buffer.from(mySignature), Buffer.from(slackSignature))) {
